@@ -8,8 +8,9 @@ import hashlib
 import hmac
 import json
 import streamlit as st
-import streamlit.components.v1 as components
+from streamlit_local_storage import LocalStorage
 
+_ls = LocalStorage()
 _LS_KEY = "dd_auth"
 
 
@@ -30,11 +31,11 @@ def check_password():
     if st.session_state.get("authenticated"):
         return True
 
-    # Try auto-login from LocalStorage (set by JS on previous page load)
-    ls_value = st.session_state.get("_ls_auth", "")
-    if ls_value:
+    # Try auto-login from LocalStorage
+    saved = _ls.getItem(_LS_KEY)
+    if saved:
         try:
-            data = json.loads(ls_value) if isinstance(ls_value, str) else ls_value
+            data = json.loads(saved) if isinstance(saved, str) else saved
             saved_email = data.get("user", "")
             saved_token = data.get("token", "")
             users = _get_users()
@@ -50,30 +51,6 @@ def check_password():
     st.set_page_config(page_title="Login", page_icon="🔒")
     st.title("🔒 Data Dictionary")
 
-    # JS: read LocalStorage → put into hidden input → triggers rerun with value
-    components.html(
-        f"""<script>
-        const data = localStorage.getItem("{_LS_KEY}");
-        if (data) {{
-            const doc = window.parent.document;
-            const el = doc.querySelector('input[aria-label="_ls_auth"]');
-            if (el && !el.value) {{
-                const set = Object.getOwnPropertyDescriptor(
-                    HTMLInputElement.prototype, 'value').set;
-                set.call(el, data);
-                el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                setTimeout(() => {{
-                    el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                }}, 100);
-            }}
-        }}
-        </script>""",
-        height=0,
-    )
-
-    # Hidden input to receive LocalStorage data
-    st.text_input("_ls_auth", key="_ls_auth", label_visibility="collapsed")
-
     st.text_input("Email", placeholder="you@example.com", key="_email_input")
     st.text_input("Password", type="password", key="_pw_input")
 
@@ -86,14 +63,10 @@ def check_password():
         if expected_pw and hmac.compare_digest(pw, expected_pw):
             st.session_state["authenticated"] = True
             st.session_state["username"] = email
-            # Save token to LocalStorage via JS
-            token_data = json.dumps({"user": email, "token": _make_token(email, pw)})
-            components.html(
-                f"""<script>
-                localStorage.setItem("{_LS_KEY}", {json.dumps(token_data)});
-                </script>""",
-                height=0,
-            )
+            _ls.setItem(_LS_KEY, json.dumps({
+                "user": email,
+                "token": _make_token(email, pw),
+            }))
             st.rerun()
         else:
             st.error("Invalid email or password.")
