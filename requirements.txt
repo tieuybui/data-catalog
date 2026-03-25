@@ -1,0 +1,7 @@
+pandas
+sqlalchemy
+streamlit>=1.32.0
+azure-identity
+altair>=5.0.0,<6.0.0
+pyodbc
+streamlit-local-storage
