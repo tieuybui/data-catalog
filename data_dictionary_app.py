@@ -1448,17 +1448,23 @@ with st.sidebar:
     st.divider()
     saved_key = _load_groq_key()
     with st.expander("🤖 AI Settings", expanded=not saved_key):
-        new_key = st.text_input(
-            "Groq API Key",
-            value=saved_key,
-            type="password",
-            placeholder="gsk_...",
-            help="Free key: https://console.groq.com/keys",
-        )
-        if new_key != saved_key:
-            _save_groq_key(new_key)
-            st.success("API key saved!")
-            st.rerun()
+        if saved_key:
+            st.success("API key configured ✓")
+            if st.button("Change API Key"):
+                st.session_state.pop("_groq_key", None)
+                _save_groq_key("")
+                st.rerun()
+        else:
+            new_key = st.text_input(
+                "Groq API Key",
+                type="password",
+                placeholder="gsk_...",
+                help="Free key: https://console.groq.com/keys",
+            )
+            if new_key:
+                _save_groq_key(new_key)
+                st.success("API key saved!")
+                st.rerun()
 
 
 
