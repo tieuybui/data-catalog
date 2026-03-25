@@ -6,12 +6,12 @@ Login is persisted to browser LocalStorage.
 
 import hashlib
 import hmac
+import json
 import streamlit as st
 from streamlit_local_storage import LocalStorage
 
 _ls = LocalStorage()
-_LS_KEY = "dd_auth_token"
-_LS_USER = "dd_auth_user"
+_LS_KEY = "dd_auth"
 
 
 def _make_token(username: str, password: str) -> str:
@@ -30,15 +30,19 @@ def check_password():
         return True
 
     # Check LocalStorage for saved token
-    saved_token = _ls.getItem(_LS_KEY)
-    saved_user = _ls.getItem(_LS_USER)
-
-    if saved_user and saved_token:
-        expected_pw = users.get(saved_user)
-        if expected_pw and saved_token == _make_token(saved_user, expected_pw):
-            st.session_state["authenticated"] = True
-            st.session_state["username"] = saved_user
-            return True
+    saved = _ls.getItem(_LS_KEY)
+    if saved:
+        try:
+            data = json.loads(saved) if isinstance(saved, str) else saved
+            saved_user = data.get("user", "")
+            saved_token = data.get("token", "")
+            expected_pw = users.get(saved_user)
+            if expected_pw and saved_token == _make_token(saved_user, expected_pw):
+                st.session_state["authenticated"] = True
+                st.session_state["username"] = saved_user
+                return True
+        except (json.JSONDecodeError, AttributeError):
+            pass
 
     def _on_submit():
         email = st.session_state.get("_email_input", "").strip().lower()
@@ -48,8 +52,10 @@ def check_password():
         if expected_pw and hmac.compare_digest(pw, expected_pw):
             st.session_state["authenticated"] = True
             st.session_state["username"] = email
-            _ls.setItem(_LS_KEY, _make_token(email, pw))
-            _ls.setItem(_LS_USER, email)
+            _ls.setItem(_LS_KEY, json.dumps({
+                "user": email,
+                "token": _make_token(email, pw),
+            }))
         else:
             st.session_state["_login_error"] = True
 
@@ -71,4 +77,3 @@ def logout():
     st.session_state.pop("authenticated", None)
     st.session_state.pop("username", None)
     _ls.deleteItem(_LS_KEY)
-    _ls.deleteItem(_LS_USER)
