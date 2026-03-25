@@ -26,8 +26,13 @@ def check_password():
         if expected_pw and hmac.compare_digest(pw, expected_pw):
             st.session_state["authenticated"] = True
             st.session_state["username"] = email
+            st.session_state.pop("_login_error", None)
         else:
             st.session_state["_login_error"] = True
+
+    # Already authenticated after callback — skip login page
+    if st.session_state.get("authenticated"):
+        return True
 
     st.set_page_config(page_title="Login", page_icon="🔒")
 
