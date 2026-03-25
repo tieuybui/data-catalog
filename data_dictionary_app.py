@@ -22,6 +22,14 @@ ls = LocalStorage()
 restore_auth(ls)
 check_password()
 
+# Preload LocalStorage values into session_state on first run
+if "_ls_synced" not in st.session_state:
+    _groq_val = ls.getItem("dd_groq_api_key") if "_groq_key" not in st.session_state else None
+    if _groq_val:
+        st.session_state["_groq_key"] = _groq_val.strip()
+    st.session_state["_ls_synced"] = True
+    st.rerun()
+
 # Auto-detect ODBC driver: prefer 18 (local), fallback to 17 (Streamlit Cloud)
 _ODBC_DRIVER = None
 for _drv in ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server"]:
