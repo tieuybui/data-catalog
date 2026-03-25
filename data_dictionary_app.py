@@ -17,7 +17,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 from streamlit_local_storage import LocalStorage
 
-from auth import check_password
+from auth import check_password, logout
 check_password()
 
 ls = LocalStorage()
@@ -1144,7 +1144,14 @@ if "selected_table" not in st.session_state:
 # Sidebar
 # ════════════════════════════════════════
 with st.sidebar:
-    st.title("📖 Data Dictionary")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("📖 Data Dictionary")
+    with col2:
+        st.caption(st.session_state.get("username", ""))
+        if st.button("Logout", type="secondary"):
+            logout()
+            st.rerun()
 
     # Environment selector
     env_options = list(ENV_CONFIGS.keys())

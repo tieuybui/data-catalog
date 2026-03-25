@@ -1,37 +1,74 @@
 """
-Simple password protection for Streamlit app.
-Uses st.secrets["password"] set via .streamlit/secrets.toml or Streamlit Cloud secrets.
+Password protection with multi-user support.
+Users are defined in st.secrets["users"] as email = password pairs.
+Login is persisted to browser LocalStorage.
 """
 
+import hashlib
 import hmac
 import streamlit as st
+from streamlit_local_storage import LocalStorage
+
+_ls = LocalStorage()
+_LS_KEY = "dd_auth_token"
+_LS_USER = "dd_auth_user"
+
+
+def _make_token(username: str, password: str) -> str:
+    return hashlib.sha256(f"{username}:{password}".encode()).hexdigest()
 
 
 def check_password():
-    """Return True if the user has entered the correct password."""
+    """Block access unless user provides valid credentials."""
 
-    if "password" not in st.secrets:
-        # No password configured — allow access
+    if "users" not in st.secrets:
         return True
+
+    users: dict = dict(st.secrets["users"])
 
     if st.session_state.get("authenticated"):
         return True
 
-    def _on_submit():
-        if hmac.compare_digest(
-            st.session_state.get("_password_input", ""),
-            st.secrets["password"],
-        ):
+    # Check LocalStorage for saved token
+    saved_token = _ls.getItem(_LS_KEY)
+    saved_user = _ls.getItem(_LS_USER)
+
+    if saved_user and saved_token:
+        expected_pw = users.get(saved_user)
+        if expected_pw and saved_token == _make_token(saved_user, expected_pw):
             st.session_state["authenticated"] = True
+            st.session_state["username"] = saved_user
+            return True
+
+    def _on_submit():
+        email = st.session_state.get("_email_input", "").strip().lower()
+        pw = st.session_state.get("_password_input", "")
+        expected_pw = users.get(email)
+
+        if expected_pw and hmac.compare_digest(pw, expected_pw):
+            st.session_state["authenticated"] = True
+            st.session_state["username"] = email
+            _ls.setItem(_LS_KEY, _make_token(email, pw))
+            _ls.setItem(_LS_USER, email)
         else:
-            st.session_state["_password_wrong"] = True
+            st.session_state["_login_error"] = True
 
     st.set_page_config(page_title="Login", page_icon="🔒")
 
     st.title("🔒 Data Dictionary")
-    st.text_input("Password", type="password", key="_password_input", on_change=_on_submit)
+    st.text_input("Email", key="_email_input", placeholder="you@example.com")
+    st.text_input("Password", type="password", key="_password_input")
+    st.button("Login", on_click=_on_submit)
 
-    if st.session_state.get("_password_wrong"):
-        st.error("Incorrect password. Please try again.")
+    if st.session_state.get("_login_error"):
+        st.error("Invalid email or password.")
 
     st.stop()
+
+
+def logout():
+    """Clear auth state and LocalStorage."""
+    st.session_state.pop("authenticated", None)
+    st.session_state.pop("username", None)
+    _ls.deleteItem(_LS_KEY)
+    _ls.deleteItem(_LS_USER)
