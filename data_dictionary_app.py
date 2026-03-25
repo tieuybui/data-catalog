@@ -1445,11 +1445,6 @@ with st.sidebar:
             st.success("API key saved!")
             st.rerun()
 
-    # User info
-    username = st.session_state.get("username", "")
-    if username:
-        st.divider()
-        st.caption(f"👤 {username}")
 
 
 # ════════════════════════════════════════
