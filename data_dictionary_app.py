@@ -15,8 +15,11 @@ import json
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy import create_engine, text
+from streamlit_local_storage import LocalStorage
 from auth import check_password
 check_password()
+
+ls = LocalStorage()
 
 # Auto-detect ODBC driver: prefer 18 (local), fallback to 17 (Streamlit Cloud)
 _ODBC_DRIVER = None
