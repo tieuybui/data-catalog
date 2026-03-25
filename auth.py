@@ -29,20 +29,6 @@ def check_password():
     if st.session_state.get("authenticated"):
         return True
 
-    # Logging out — render JS to clear LocalStorage, then show login
-    if st.session_state.get("_logging_out"):
-        st.set_page_config(page_title="Logging out...", page_icon="🔒")
-        components.html(
-            f"""<script>
-            localStorage.removeItem("{_LS_KEY}");
-            // Reload to show clean login page
-            window.parent.location.reload();
-            </script>""",
-            height=0,
-        )
-        st.session_state.pop("_logging_out", None)
-        st.stop()
-
     # Try auto-login from LocalStorage (passed via hidden input on previous load)
     ls_data = st.session_state.get("_ls_data")
     if ls_data:
@@ -109,11 +95,3 @@ def check_password():
             st.error("Invalid email or password.")
 
     st.stop()
-
-
-def logout():
-    """Set flag to clear LocalStorage on next render."""
-    st.session_state.pop("authenticated", None)
-    st.session_state.pop("username", None)
-    st.session_state.pop("_ls_data", None)
-    st.session_state["_logging_out"] = True

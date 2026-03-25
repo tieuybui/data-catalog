@@ -15,12 +15,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy import create_engine, text
-from streamlit_local_storage import LocalStorage
-
-from auth import check_password, logout
+from auth import check_password
 check_password()
-
-ls = LocalStorage()
 
 # Auto-detect ODBC driver: prefer 18 (local), fallback to 17 (Streamlit Cloud)
 _ODBC_DRIVER = None
@@ -1446,15 +1442,11 @@ with st.sidebar:
             st.success("API key saved!")
             st.rerun()
 
-    # User info & logout
-    st.divider()
+    # User info
     username = st.session_state.get("username", "")
     if username:
-        col_user, col_logout = st.columns([3, 1])
-        col_user.caption(f"👤 {username}")
-        if col_logout.button("↩", help="Logout"):
-            logout()
-            st.rerun()
+        st.divider()
+        st.caption(f"👤 {username}")
 
 
 # ════════════════════════════════════════
