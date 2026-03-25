@@ -10,7 +10,6 @@ import json
 import streamlit as st
 from streamlit_local_storage import LocalStorage
 
-_ls = LocalStorage()
 _LS_KEY = "dd_auth"
 
 
@@ -32,6 +31,7 @@ def check_password():
         return True
 
     # Try auto-login from LocalStorage
+    _ls = LocalStorage()
     saved = _ls.getItem(_LS_KEY)
     if saved:
         try:
@@ -63,7 +63,7 @@ def check_password():
         if expected_pw and hmac.compare_digest(pw, expected_pw):
             st.session_state["authenticated"] = True
             st.session_state["username"] = email
-            _ls.setItem(_LS_KEY, json.dumps({
+            LocalStorage().setItem(_LS_KEY, json.dumps({
                 "user": email,
                 "token": _make_token(email, pw),
             }))
