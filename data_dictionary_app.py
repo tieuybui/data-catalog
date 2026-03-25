@@ -1345,46 +1345,45 @@ with st.sidebar:
 
     st.divider()
 
-    # Search
-    search = st.text_input("🔍 Search tables", placeholder="Type to filter...")
+    with st.expander(f"📋 Tables ({total_tables})", expanded=True):
+        # Search
+        search = st.text_input("🔍 Search tables", placeholder="Type to filter...")
 
-    # Layer filter
-    layers = sorted(dd_tables["layer"].unique().tolist())
-    layer_filter = st.multiselect("Filter by layer", layers, default=layers)
+        # Layer filter
+        layers = sorted(dd_tables["layer"].unique().tolist())
+        layer_filter = st.multiselect("Filter by layer", layers, default=layers)
 
-    st.divider()
+        # Filter tables
+        filtered = dd_tables[dd_tables["layer"].isin(layer_filter)]
+        if search:
+            mask = (
+                filtered["table_name"].str.contains(search, case=False, na=False)
+                | filtered["description"].str.contains(search, case=False, na=False)
+            )
+            filtered = filtered[mask]
 
-    # Filter tables
-    filtered = dd_tables[dd_tables["layer"].isin(layer_filter)]
-    if search:
-        mask = (
-            filtered["table_name"].str.contains(search, case=False, na=False)
-            | filtered["description"].str.contains(search, case=False, na=False)
-        )
-        filtered = filtered[mask]
+        # Table list
+        table_names = filtered["table_name"].tolist()
+        if table_names:
+            # Build display labels with layer prefix
+            labels = []
+            for _, row in filtered.iterrows():
+                layer_tag = row["layer"].upper()
+                name = row["table_name"]
+                rc = _safe_get(row, "row_count")
+                rows = f"{int(rc):,}" if rc is not None else "?"
+                labels.append(f"[{layer_tag}] {name} ({rows} rows)")
 
-    # Table list
-    table_names = filtered["table_name"].tolist()
-    if table_names:
-        # Build display labels with layer prefix
-        labels = []
-        for _, row in filtered.iterrows():
-            layer_tag = row["layer"].upper()
-            name = row["table_name"]
-            rc = _safe_get(row, "row_count")
-            rows = f"{int(rc):,}" if rc is not None else "?"
-            labels.append(f"[{layer_tag}] {name} ({rows} rows)")
-
-        selected_idx = st.radio(
-            "Tables",
-            range(len(table_names)),
-            format_func=lambda i: labels[i],
-            label_visibility="collapsed",
-        )
-        st.session_state.selected_table = table_names[selected_idx]
-    else:
-        st.warning("No tables match your filter.")
-        st.session_state.selected_table = None
+            selected_idx = st.radio(
+                "Tables",
+                range(len(table_names)),
+                format_func=lambda i: labels[i],
+                label_visibility="collapsed",
+            )
+            st.session_state.selected_table = table_names[selected_idx]
+        else:
+            st.warning("No tables match your filter.")
+            st.session_state.selected_table = None
 
     st.divider()
 
