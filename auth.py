@@ -24,9 +24,9 @@ def check_password():
 
     if st.button("Login"):
         email = email.strip().lower()
-        users = dict(st.secrets["users"])
-        # Ensure string comparison
-        expected_pw = str(users.get(email, ""))
+        # Normalize keys to lowercase for case-insensitive email match
+        users = {str(k).lower(): str(v) for k, v in st.secrets["users"].items()}
+        expected_pw = users.get(email, "")
 
         if expected_pw and hmac.compare_digest(pw, expected_pw):
             st.session_state["authenticated"] = True
