@@ -29,20 +29,24 @@ def check_password():
     if st.session_state.get("authenticated"):
         return True
 
-    # Check LocalStorage for saved token
-    saved = _ls.getItem(_LS_KEY)
-    if saved:
-        try:
-            data = json.loads(saved) if isinstance(saved, str) else saved
-            saved_user = data.get("user", "")
-            saved_token = data.get("token", "")
-            expected_pw = users.get(saved_user)
-            if expected_pw and saved_token == _make_token(saved_user, expected_pw):
-                st.session_state["authenticated"] = True
-                st.session_state["username"] = saved_user
-                return True
-        except (json.JSONDecodeError, AttributeError):
-            pass
+    # Skip auto-login if user just logged out
+    if st.session_state.get("_logged_out"):
+        pass
+    else:
+        # Check LocalStorage for saved token
+        saved = _ls.getItem(_LS_KEY)
+        if saved:
+            try:
+                data = json.loads(saved) if isinstance(saved, str) else saved
+                saved_user = data.get("user", "")
+                saved_token = data.get("token", "")
+                expected_pw = users.get(saved_user)
+                if expected_pw and saved_token == _make_token(saved_user, expected_pw):
+                    st.session_state["authenticated"] = True
+                    st.session_state["username"] = saved_user
+                    return True
+            except (json.JSONDecodeError, AttributeError):
+                pass
 
     def _on_submit():
         email = st.session_state.get("_email_input", "").strip().lower()
@@ -52,6 +56,7 @@ def check_password():
         if expected_pw and hmac.compare_digest(pw, expected_pw):
             st.session_state["authenticated"] = True
             st.session_state["username"] = email
+            st.session_state.pop("_logged_out", None)
             _ls.setItem(_LS_KEY, json.dumps({
                 "user": email,
                 "token": _make_token(email, pw),
@@ -69,13 +74,15 @@ def check_password():
     if st.session_state.get("_login_error"):
         st.error("Invalid email or password.")
 
+    # Clear LocalStorage token (rendered as hidden component)
+    if st.session_state.get("_logged_out"):
+        _ls.setItem(_LS_KEY, "")
+
     st.stop()
 
 
 def logout():
-    """Clear auth state and LocalStorage."""
+    """Clear auth state — token is cleared on next login page render."""
     st.session_state.pop("authenticated", None)
     st.session_state.pop("username", None)
-    # Overwrite with empty string to invalidate token
-    # (deleteItem fails because server-side dict resets on rerun)
-    _ls.setItem(_LS_KEY, "")
+    st.session_state["_logged_out"] = True
