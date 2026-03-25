@@ -725,7 +725,7 @@ def cleanup_stale_records() -> tuple[list[str], list[tuple[str, str]]]:
 
 
 def generate_cleanup_code(stale_tables: list[str], stale_columns: list[tuple[str, str]]) -> str:
-    """Generate Fabric notebook code to delete stale records."""
+    """Generate Fabric notebook code to delete stale records using batch SQL."""
     db = f"{FABRIC_DATABASE}.dbo"
     lines = [
         "# ════════════════════════════════════════",
@@ -735,22 +735,33 @@ def generate_cleanup_code(stale_tables: list[str], stale_columns: list[tuple[str
         "",
     ]
 
-    for tn in stale_tables:
-        safe_tn = _sql_escape(tn)
-        lines.append(f"spark.sql(\"DELETE FROM {db}.dd_tables WHERE table_name = '{safe_tn}'\")")
-        lines.append(f"spark.sql(\"DELETE FROM {db}.dd_columns WHERE table_name = '{safe_tn}'\")")
-        lines.append(f"print('Removed table: {tn}')")
+    # Batch delete stale tables
+    if stale_tables:
+        in_list = ", ".join(f"'{_sql_escape(tn)}'" for tn in stale_tables)
+        lines.append(f"# Remove {len(stale_tables)} stale tables")
+        lines.append(f"spark.sql(\"DELETE FROM {db}.dd_tables WHERE table_name IN ({in_list})\")")
+        lines.append(f"spark.sql(\"DELETE FROM {db}.dd_columns WHERE table_name IN ({in_list})\")")
+        lines.append(f"print('Removed {len(stale_tables)} stale tables')")
         lines.append("")
 
-    # Columns whose table still exists but column was dropped
+    # Batch delete stale columns (grouped by table)
     seen_tables = set(stale_tables)
+    orphan_cols: dict[str, list[str]] = {}
     for tn, cn in stale_columns:
-        if tn in seen_tables:
-            continue  # already handled by table delete above
-        safe_tn = _sql_escape(tn)
-        safe_cn = _sql_escape(cn)
-        lines.append(f"spark.sql(\"DELETE FROM {db}.dd_columns WHERE table_name = '{safe_tn}' AND column_name = '{safe_cn}'\")")
-        lines.append(f"print('Removed column: {tn}.{cn}')")
+        if tn not in seen_tables:
+            orphan_cols.setdefault(tn, []).append(cn)
+
+    if orphan_cols:
+        total_cols = sum(len(v) for v in orphan_cols.values())
+        lines.append(f"# Remove {total_cols} stale columns from {len(orphan_cols)} tables")
+        for tn, cols in orphan_cols.items():
+            safe_tn = _sql_escape(tn)
+            col_list = ", ".join(f"'{_sql_escape(cn)}'" for cn in cols)
+            lines.append(
+                f"spark.sql(\"DELETE FROM {db}.dd_columns "
+                f"WHERE table_name = '{safe_tn}' AND column_name IN ({col_list})\")"
+            )
+        lines.append(f"print('Removed {total_cols} stale columns')")
         lines.append("")
 
     lines.append(f"print('Cleanup done: {len(stale_tables)} tables, {len(stale_columns)} columns removed')")
