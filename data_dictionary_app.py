@@ -997,6 +997,7 @@ def _generate_fabric_code() -> str | None:
         lines.append(f"    WHEN NOT MATCHED THEN INSERT ({tbl_cols}) VALUES ({tbl_src_cols})")
         lines.append(f'""")')
         lines.append(f"print(f'Updated {{len(tbl_data)}} table(s)')")
+        lines.append("spark.catalog.dropTempView('_dd_edit_tables')")
         lines.append("")
 
     # ── Column updates ──
@@ -1042,6 +1043,7 @@ def _generate_fabric_code() -> str | None:
         lines.append(f"    WHEN NOT MATCHED THEN INSERT ({col_cols}) VALUES ({col_src_cols})")
         lines.append(f'""")')
         lines.append(f"print(f'Updated {{len(col_data)}} column(s)')")
+        lines.append("spark.catalog.dropTempView('_dd_edit_columns')")
         lines.append("")
 
     tbl_count = len(tbl_rows)
