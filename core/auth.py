@@ -30,6 +30,7 @@ def check_password():
             and hmac.compare_digest(pw, st.secrets["password"])
         ):
             st.session_state["authenticated"] = True
+            st.session_state["_just_logged_in"] = True
             st.rerun()
         else:
             st.error("Invalid username or password.")
@@ -40,8 +41,8 @@ def check_password():
 def restore_auth(ls):
     """Call after LocalStorage is created in main app to restore/save auth."""
     if st.session_state.get("authenticated"):
-        # Keep writing until localStorage confirms the value is stored
-        if ls.getItem(_LS_KEY) != "1":
+        # Just logged in — save to LocalStorage
+        if st.session_state.pop("_just_logged_in", False):
             ls.setItem(_LS_KEY, "1")
         return
 

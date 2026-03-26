@@ -17,16 +17,19 @@ from ui.table_detail import render_table_detail
 
 # ── Auth ──
 ls = LocalStorage()
-restore_auth(ls)
-check_password()
 
 # Preload LocalStorage values into session_state on first run
+# Must happen BEFORE restore_auth so the _ls_synced rerun
+# doesn't interrupt the setItem call that persists login.
 if "_ls_synced" not in st.session_state:
     _groq_val = ls.getItem("dd_groq_api_key") if "_groq_key" not in st.session_state else None
     if _groq_val:
         st.session_state["_groq_key"] = _groq_val.strip()
     st.session_state["_ls_synced"] = True
     st.rerun()
+
+restore_auth(ls)
+check_password()
 
 # ── Init ──
 check_odbc_driver()
