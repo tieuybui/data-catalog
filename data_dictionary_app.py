@@ -843,6 +843,39 @@ def update_column_fields(table_name: str, column_name: str, fields: dict):
     )
 
 
+def batch_update_column_fields(updates: list[tuple[str, str, dict]]):
+    """Batch update multiple columns in a single transaction.
+    updates: list of (table_name, column_name, fields_dict)
+    """
+    if not updates:
+        return
+    if _is_fabric():
+        # Batch all overrides into a single file write
+        ov = _load_overrides()
+        now = datetime.now().isoformat()
+        for table_name, column_name, fields in updates:
+            key = f"{table_name}::{column_name}"
+            ov["columns"].setdefault(key, {"table_name": table_name, "column_name": column_name})
+            ov["columns"][key].update({k: v for k, v in fields.items() if v is not None})
+            ov["columns"][key]["updated_at"] = now
+        _save_overrides(ov)
+        return
+    now = datetime.now().isoformat()
+    with get_engine(st.session_state.env).connect() as conn:
+        for table_name, column_name, fields in updates:
+            fields = dict(fields)  # avoid mutating caller's dict
+            fields["updated_at"] = now
+            set_parts = ", ".join(f"{k} = :{k}" for k in fields)
+            fields["_table_name"] = table_name
+            fields["_column_name"] = column_name
+            conn.execute(
+                text(f"UPDATE dbo.dd_columns SET {set_parts} "
+                     f"WHERE table_name = :_table_name AND column_name = :_column_name"),
+                fields,
+            )
+        conn.commit()
+
+
 def export_json() -> str:
     tables = load_dd_tables()
     columns = load_dd_columns()
@@ -1664,7 +1697,7 @@ else:
         )
 
         if st.button("💾 Save Column Edits", type="primary"):
-            changes = 0
+            batch = []
             for idx in range(len(edited)):
                 orig_row = original_df.iloc[idx]
                 edit_row = edited.iloc[idx]
@@ -1687,14 +1720,14 @@ else:
                         elif str(ov or "") != str(ev or ""):
                             updates[field] = ev
                 if updates:
-                    update_column_fields(selected, col_name, updates)
-                    changes += 1
+                    batch.append((selected, col_name, updates))
 
-            if changes:
+            if batch:
+                batch_update_column_fields(batch)
                 if _is_fabric():
-                    st.success(f"Queued {changes} column(s)! Check sidebar for generated code.")
+                    st.success(f"Queued {len(batch)} column(s)! Check sidebar for generated code.")
                 else:
-                    st.success(f"Saved {changes} column(s)!")
+                    st.success(f"Saved {len(batch)} column(s)!")
                 st.rerun()
             else:
                 st.info("No changes detected.")
